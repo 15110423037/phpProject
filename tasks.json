@@ -1,0 +1,22 @@
+[
+    {
+        "id": "mm9k04v9s0ecjqnj4d",
+        "title": "Taks 1",
+        "status": "done",
+        "dueDate": "",
+        "info": "<b><u style=\"\"><i>this is a <\/i>sample <i>task&nbsp;<\/i><\/u><\/b>",
+        "subtasks": [
+            {
+                "id": "mm9knu0uxr9kraw5a5m",
+                "title": "first sbt",
+                "done": false
+            },
+            {
+                "id": "mm9knu0u56b1zn7akvx",
+                "title": "2nd tt tas",
+                "done": false
+            }
+        ],
+        "createdAt": "2026-03-02T19:10:15.717Z"
+    }
+]
