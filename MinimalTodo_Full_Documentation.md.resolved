@@ -1,0 +1,1470 @@
+# MinimalTodo — Full Project Documentation
+### *"Everything you need to learn PHP, HTML, JS and this project — from scratch"*
+
+---
+
+> **How to use this doc**: Read it section by section. Every concept is explained before it is used in the project. By the end, you should be able to re-write the project yourself and answer any viva question confidently.
+
+---
+
+# PART 1: What is PHP?
+
+## 1.1 The Big Picture — How Websites Work
+
+When you type `http://localhost:8000` in your browser, this happens:
+1. Your browser sends an **HTTP Request** to the server: *"Give me index.php"*
+2. The server (PHP built-in server in this case) picks up the file
+3. PHP **executes** the code in the file on the server
+4. PHP sends back **plain HTML text** to the browser
+5. Your browser reads that HTML and displays it
+
+> **Key Insight**: PHP runs on the **server** (your computer acting as a server). JavaScript runs in the **browser**. They are in different places and communicate over HTTP.
+
+## 1.2 What is PHP?
+
+PHP stands for **Hypertext Preprocessor** (recursive acronym). It is a **server-side scripting language**, meaning:
+- The user never sees your PHP code
+- PHP processes data, files, databases etc. on the server
+- It outputs HTML/JSON/text back to the browser
+
+PHP files use the [.php](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php) extension. A PHP file can contain a mix of PHP code and HTML.
+
+## 1.3 PHP Syntax Rules — The Complete Primer
+
+### Rule 1: PHP Tags
+All PHP code must be wrapped in open/close tags:
+```php
+<?php
+  // PHP code goes here
+?>
+```
+Everything outside these tags is treated as plain HTML and sent directly to the browser.
+
+### Rule 2: Statements end with `;`
+Every PHP statement (instruction) ends with a semicolon, just like a period at the end of a sentence.
+```php
+$name = "Harsh";   // This is one statement
+echo $name;        // This is another statement
+```
+
+### Rule 3: Variables start with `$`
+```php
+$age = 21;
+$name = "Harsh";
+$isStudent = true;
+```
+
+### Rule 4: Data Types
+```php
+$integer   = 42;           // Whole number
+$float     = 3.14;         // Decimal number
+$string    = "Hello";      // Text (in quotes)
+$boolean   = true;         // true or false
+$array     = [1, 2, 3];    // A list of values
+$null      = null;         // No value / empty
+```
+
+### Rule 5: String Concatenation
+Use the `.` (dot) operator to join strings:
+```php
+$first = "Hello";
+$second = "World";
+echo $first . " " . $second;  // Outputs: Hello World
+```
+
+### Rule 6: Conditional Logic
+```php
+if ($age >= 18) {
+    echo "Adult";
+} elseif ($age >= 13) {
+    echo "Teenager";
+} else {
+    echo "Child";
+}
+```
+
+### Rule 7: Functions
+A function is a reusable block of code:
+```php
+function greet($personName) {
+    return "Hello, " . $personName . "!";
+}
+echo greet("Harsh");  // Outputs: Hello, Harsh!
+```
+
+### Rule 8: `global` keyword
+If a variable is defined outside a function, the function cannot see it by default. You must use `global` to bring it in:
+```php
+$myGlobal = "I am global";
+
+function testFunc() {
+    global $myGlobal;       // Now I can access it
+    echo $myGlobal;         // Works!
+}
+```
+
+### Rule 9: Arrays (Lists)
+```php
+// Indexed Array (like a numbered list)
+$fruits = ["apple", "banana", "mango"];
+echo $fruits[0];  // apple (index starts at 0)
+
+// Associative Array (like a dictionary)
+$task = [
+    "id"     => "abc123",
+    "title"  => "Buy milk",
+    "status" => "todo"
+];
+echo $task["title"];  // Buy milk
+```
+
+### Rule 10: Built-in Functions used in this project
+
+| Function | What it does |
+|---|---|
+| `file_exists($path)` | Returns `true` if the file exists on the disk |
+| `file_get_contents($path)` | Reads an entire file and returns its content as a string |
+| `file_put_contents($path, $data)` | Writes a string to a file (creates it if missing, overwrites if exists) |
+| `json_decode($string, true)` | Converts a JSON string into a PHP associative array |
+| `json_encode($array)` | Converts a PHP array into a JSON string |
+| `isset($var)` | Returns `true` if a variable exists and is not `null` |
+| `header($string)` | Sends an HTTP header to the browser before any output |
+
+---
+
+# PART 2: Project File Structure
+
+```
+php stuff/
+├── index.php       ← The ONLY PHP file. Does everything.
+├── tasks.json      ← The "database" file. Stores all tasks.
+├── SPEC.md         ← Project specification (requirements doc)
+└── css/
+    └── styles.css  ← All CSS styles for the UI
+```
+
+**Why only one PHP file?** This is called a **Single File Application** pattern. It handles the API (data), the page rendering, and the HTML template all in one place. It's simple to deploy — just copy the folder.
+
+---
+
+# PART 3: [index.php](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php) — Line by Line
+
+## 3.1 The PHP Block (Lines 1–39)
+
+This entire block runs on the server before anything is shown to the user.
+
+### Line 1: Opening PHP Tag
+```php
+<?php
+```
+Everything after this is PHP code until the closing `?>` tag.
+
+---
+
+### Line 2: Setting the Content-Type Header
+```php
+header('Content-Type: text/html; charset=UTF-8');
+```
+**What is a Header?** An HTTP response has two parts: **Headers** (meta-information) and **Body** (actual content). Here we tell the browser:
+- `Content-Type: text/html` → "I am sending you HTML"
+- `charset=UTF-8` → "The text is encoded in UTF-8" (supports all languages/special characters)
+
+> **Rule**: `header()` must be called BEFORE any output (`echo`, HTML etc.), otherwise PHP throws an error.
+
+---
+
+### Line 4: Defining the Tasks File Path
+```php
+$tasksFile = 'tasks.json';
+```
+We store the filename in a variable so if we ever want to rename the file, we change it in one place. This is a good programming practice called **DRY (Don't Repeat Yourself)**.
+
+---
+
+### Lines 6–12: The [loadTasks()](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php#6-13) Function
+
+```php
+function loadTasks() {
+    global $tasksFile;
+    if (!file_exists($tasksFile)) {
+        file_put_contents($tasksFile, '[]');
+    }
+    return json_decode(file_get_contents($tasksFile), true) ?: [];
+}
+```
+
+Let's break this down **piece by piece**:
+
+#### `global $tasksFile;`
+The variable `$tasksFile` was defined outside the function (at line 4). PHP functions have their own **scope** — they can't see variables from outside. The `global` keyword imports it.
+
+#### `if (!file_exists($tasksFile))`
+- `file_exists($tasksFile)` → checks if [tasks.json](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/tasks.json) exists. Returns `true` or `false`.
+- The `!` (NOT operator) flips it: `!true` = `false`, `!false` = `true`
+- So: "**if** the file does **NOT** exist, run the block"
+
+#### `file_put_contents($tasksFile, '[]');`
+- Creates [tasks.json](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/tasks.json) and writes `[]` into it
+- `[]` is an **empty JSON array** — an empty list of tasks
+- This is the "first run" initialization
+
+#### `return json_decode(file_get_contents($tasksFile), true) ?: [];`
+This is a chain of operations. Let's read it inside-out:
+
+1. `file_get_contents($tasksFile)` → Reads [tasks.json](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/tasks.json). Returns a string like `[{"id":"abc","title":"Task 1"}]`
+2. `json_decode(..., true)` → Converts the JSON string to a PHP array. The `true` means "give me an associative array (dictionary), not an object"
+3. `?: []` → This is the **Null Coalescing Elvis Operator**. If `json_decode` returns `null` (file was empty/corrupted), use `[]` (empty array) instead as a fallback.
+4. `return` → Sends this value back to whoever called the function.
+
+---
+
+### Lines 14–17: The [saveTasks()](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php#14-18) Function
+
+```php
+function saveTasks($tasks) {
+    global $tasksFile;
+    file_put_contents($tasksFile, json_encode($tasks, JSON_PRETTY_PRINT));
+}
+```
+
+#### `$tasks` parameter
+This function accepts a PHP array of tasks as input (called a **parameter**).
+
+#### `json_encode($tasks, JSON_PRETTY_PRINT)`
+1. `json_encode($tasks)` → Converts the PHP array back to a JSON string
+2. `JSON_PRETTY_PRINT` → A **flag** (option) that formats the JSON with indentation so it's human-readable in the file:
+```json
+[
+    {
+        "id": "abc123",
+        "title": "Buy milk"
+    }
+]
+```
+Without this flag it would all be one line: `[{"id":"abc123","title":"Buy milk"}]`
+
+#### `file_put_contents($tasksFile, ...)`
+Writes the JSON string to [tasks.json](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/tasks.json). **Overwrites** the entire file each time — this is intentional (the whole array is always saved fresh).
+
+---
+
+### Line 19: Getting the HTTP Method
+```php
+$method = $_SERVER['REQUEST_METHOD'];
+```
+
+#### `$_SERVER`
+This is a PHP **Superglobal** — a special pre-built variable that contains information about the server and the current HTTP request. It is always available everywhere in PHP.
+
+**Common `$_SERVER` values:**
+
+| Key | What it contains |
+|---|---|
+| `$_SERVER['REQUEST_METHOD']` | `'GET'` or `'POST'` |
+| `$_SERVER['REQUEST_URI']` | The URL path (e.g., `/index.php?api=tasks`) |
+| `$_SERVER['HTTP_HOST']` | The domain (e.g., `localhost:8000`) |
+
+In this project, when JavaScript calls `fetch('?api=tasks')`, the method is `GET`. When it calls `fetch('', {method: 'POST', ...})`, the method is `POST`.
+
+---
+
+### Lines 21–26: The GET API Handler
+
+```php
+if ($method === 'GET' && isset($_GET['api'])) {
+    if ($_GET['api'] === 'tasks') {
+        echo json_encode(loadTasks());
+    }
+    exit;
+}
+```
+
+#### `$_GET`
+Another PHP Superglobal. It captures **URL query parameters**. For the URL `index.php?api=tasks`:
+- `$_GET['api']` = `"tasks"`
+
+#### `===` vs `==`
+- `==` checks if values are equal (loose comparison): `"1" == 1` is `true`
+- `===` checks if values AND types are equal (strict): `"1" === 1` is `false`
+Always use `===` to avoid unexpected bugs.
+
+#### `&&` (AND operator)
+Both conditions must be true:
+- `$method === 'GET'` → Is it a GET request?
+- `isset($_GET['api'])` → Does the URL have an `?api=something` parameter?
+
+#### `echo json_encode(loadTasks());`
+If both conditions are true and the api value is `'tasks'`:
+1. Call [loadTasks()](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php#6-13) → returns a PHP array
+2. `json_encode(...)` → converts that PHP array to a JSON string
+3. `echo` → prints that JSON string to the HTTP response body
+4. JavaScript receives this JSON string as the response to its `fetch()` call
+
+#### `exit;`
+**Crucially important!** This stops PHP from executing any further code. Without it, PHP would continue and print the entire HTML page *after* the JSON, which would corrupt the response.
+
+---
+
+### Lines 28–36: The POST API Handler
+
+```php
+if ($method === 'POST') {
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    if (isset($input['action']) && $input['action'] === 'save') {
+        saveTasks($input['tasks']);
+        echo json_encode(['success' => true]);
+        exit;
+    }
+}
+```
+
+#### `file_get_contents('php://input')`
+When JavaScript sends a POST request with JSON body:
+```javascript
+fetch('', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action: 'save', tasks})
+});
+```
+The raw JSON body arrives at the server. `php://input` is a **special PHP stream** that gives access to that raw body data. It's like a "pipe" that reads the incoming request body.
+
+#### `$input = json_decode(..., true)`
+Converts the raw JSON body string into a PHP associative array:
+```php
+// $input now looks like:
+[
+    'action' => 'save',
+    'tasks' => [
+        ['id' => 'abc', 'title' => 'Task 1', ...],
+        ...
+    ]
+]
+```
+
+#### [saveTasks($input['tasks'])](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php#14-18)
+Calls our [saveTasks](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php#14-18) function with the array of tasks received from the browser.
+
+#### `echo json_encode(['success' => true])`
+Sends back a JSON response: `{"success": true}`. JavaScript can check this to know the save was successful.
+
+---
+
+### Line 38: Loading tasks for initial render
+```php
+$tasks = loadTasks();
+```
+This loads tasks into `$tasks` for any initial server-side rendering (though in this project, tasks are loaded again by JavaScript after page load, so this line is mostly for potential server-side use).
+
+---
+
+### Line 39: Closing PHP Tag
+```php
+?>
+```
+After this, everything is plain HTML that gets sent directly to the browser.
+
+---
+
+## 3.2 The HTML Structure (Lines 40–139)
+
+HTML (HyperText Markup Language) is the skeleton of the web page. Every visual element is an HTML **tag** (element).
+
+### Basic HTML Anatomy
+```html
+<tagname attribute="value">Content goes here</tagname>
+```
+- **Opening tag**: `<tagname>`
+- **Closing tag**: `</tagname>`
+- **Self-closing tag** (no content): `<input type="text">`
+- **Attributes**: Extra information about the element
+
+### Lines 40–47: The Document Setup
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MinimalTodo</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+```
+
+| Element | Purpose |
+|---|---|
+| `<!DOCTYPE html>` | Tells the browser this is an HTML5 document (not HTML4 or XHTML) |
+| `<html lang="en">` | Root element. `lang="en"` tells screen readers the language |
+| `<head>` | Contains metadata (not visible to user) |
+| `<meta charset="UTF-8">` | Sets character encoding (same as the PHP header we sent) |
+| `<meta name="viewport" ...>` | Makes the site responsive on mobile screens |
+| `<title>MinimalTodo</title>` | The text shown in the browser tab |
+| `<link rel="stylesheet" href="css/styles.css">` | Loads our CSS file |
+
+### Lines 48–55: The Header
+```html
+<header>
+    <h1>MinimalTodo</h1>
+    <div class="view-toggle">
+        <button class="view-btn active" data-view="kanban">Kanban</button>
+        <button class="view-btn" data-view="calendar">Calendar</button>
+    </div>
+</header>
+```
+
+#### `<header>`
+A semantic HTML5 element. "Semantic" means the tag name carries meaning — `<header>` tells developers (and search engines) this is the top section of the page, not just a generic `<div>`.
+
+#### `<h1>`
+Heading Level 1 — the most important heading on the page. SEO best practice: one `<h1>` per page.
+
+#### `data-view="kanban"` — Custom Data Attributes
+The `data-*` pattern is a standard HTML feature. You can attach any custom data to an element using `data-yourname="value"`. JavaScript reads these using:
+```javascript
+button.dataset.view  // returns "kanban"
+```
+
+#### `class="view-btn active"`
+Multiple CSS classes can be applied to one element, separated by spaces. CSS then styles it using `.view-btn` and `.active` rules.
+
+---
+
+### Lines 57–98: Main Content Area
+
+#### The Kanban View (Lines 58–85)
+```html
+<div class="kanban-view active" id="kanbanView">
+    <div class="column" data-status="todo">
+        <div class="column-header">
+            <span>Todo</span>
+            <span class="column-count" id="todoCount">0</span>
+        </div>
+        <div class="task-list" id="todoList"></div>
+        <button class="add-task-btn" data-status="todo">+ Add Task</button>
+    </div>
+    <!-- ... inprogress column ... -->
+    <!-- ... done column ... -->
+</div>
+```
+
+- `id="kanbanView"` → A unique identifier on the page. JavaScript uses `document.getElementById('kanbanView')` to grab it.
+- `<div class="task-list" id="todoList"></div>` → This div starts **empty**! JavaScript will inject task cards into it.
+- `data-status="todo"` → Used by drag-and-drop logic to know which column a task was dropped into.
+
+#### The Calendar View (Lines 87–97)
+```html
+<div class="calendar-view" id="calendarView">
+    <div class="calendar-header">
+        <div class="calendar-nav">
+            <button id="prevMonth">&lt;</button>
+            <span class="calendar-month" id="calendarMonth"></span>
+            <button id="nextMonth">&gt;</button>
+        </div>
+        <button class="btn btn-secondary" id="todayBtn">Today</button>
+    </div>
+    <div class="calendar-grid" id="calendarGrid"></div>
+</div>
+```
+
+- `&lt;` and `&gt;` are **HTML Entities** — special codes for `<` and `>`. Because `<` and `>` are used for HTML tags, we need to escape them: `&lt;` = Less Than, `&gt;` = Greater Than.
+- `id="calendarGrid"` → Also starts empty. JavaScript builds the entire calendar grid dynamically.
+
+---
+
+### Lines 100–139: The Task Modal
+
+```html
+<div class="modal-overlay" id="taskModal">
+    <div class="modal">
+        <h2 class="modal-title" id="modalTitle">Add Task</h2>
+        
+        <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="taskTitle" placeholder="Enter task title...">
+        </div>
+        
+        <div class="form-group">
+            <label>Due Date</label>
+            <input type="date" id="taskDueDate">
+        </div>
+        
+        <div class="form-group">
+            <label>Subtasks</label>
+            <div class="subtasks-list" id="subtasksList"></div>
+            <button class="add-subtask-btn" id="addSubtaskBtn">+ Add Subtask</button>
+        </div>
+        
+        <div class="form-group">
+            <label>Info</label>
+            <div class="info-toolbar">
+                <button data-command="bold"><b>B</b></button>
+                <button data-command="italic"><i>I</i></button>
+                <button data-command="underline"><u>U</u></button>
+                <button data-command="strikethrough"><s>S</s></button>
+                <button data-command="insertUnorderedList">•</button>
+                <button data-command="insertOrderedList">1.</button>
+            </div>
+            <div class="info-editor" id="infoEditor" contenteditable="true"></div>
+        </div>
+        
+        <div class="modal-actions">
+            <button class="btn btn-danger" id="deleteTaskBtn" style="display:none;">Delete</button>
+            <button class="btn btn-secondary" id="cancelBtn">Cancel</button>
+            <button class="btn btn-primary" id="saveTaskBtn">Save</button>
+        </div>
+    </div>
+</div>
+```
+
+#### What is a Modal?
+A **modal** (or dialog box) is a popup that appears on top of the page. It blocks interaction with the rest of the page until it's closed. Here:
+- `.modal-overlay` is the dark semi-transparent background
+- `.modal` is the white box in the center
+
+#### `<input type="text">` vs `<input type="date">`
+The `type` attribute changes how the input behaves:
+- `type="text"` → Free-form text field
+- `type="date"` → A calendar date picker (built into the browser!)
+- `type="checkbox"` → A tick box
+
+#### `placeholder="Enter task title..."`
+Placeholder text shown when the input is empty — it disappears when you start typing.
+
+#### `contenteditable="true"`
+This attribute on **any** HTML element makes it editable by the user, like a textarea but with rich text support. Combined with `document.execCommand()`, it acts as a basic word processor.
+
+#### `style="display:none;"`
+This is an **inline style** — CSS written directly on an element. It hides the "Delete" button. When editing a task, JavaScript sets it to `display:block` to show it.
+
+#### `data-command="bold"`
+Used by the rich text toolbar buttons. JavaScript reads this attribute to know which formatting command to apply.
+
+---
+
+## 3.3 The JavaScript Block (Lines 141–517)
+
+This is the "brain" of the UI. It runs entirely in the **browser**, not on the server.
+
+### 3.3.1 State Variables (Lines 142–145)
+
+```javascript
+let tasks = [];
+let currentView = 'kanban';
+let editingTaskId = null;
+let calendarDate = new Date();
+```
+
+These are the application's **state** — the current data held in memory:
+
+| Variable | Purpose |
+|---|---|
+| `tasks` | Array of all task objects (loaded from PHP API) |
+| `currentView` | Which view is active: `'kanban'` or `'calendar'` |
+| `editingTaskId` | The `id` of the task being edited in the modal (`null` if adding new) |
+| `calendarDate` | A `Date` object representing which month the calendar is showing |
+
+#### `let` vs `const` vs `var`
+- `let` → Can be reassigned. Used for values that change.
+- `const` → Cannot be reassigned. Used for values that are fixed.
+- `var` → Old way. Has quirky "hoisting" behavior. Avoid in modern JS.
+
+---
+
+### 3.3.2 DOM References (Lines 147–148)
+
+```javascript
+const modal = document.getElementById('taskModal');
+const subtasksList = document.getElementById('subtasksList');
+```
+
+`document.getElementById('id')` → Finds an HTML element by its `id` attribute and returns a reference to it. We store these in variables so we don't have to search the DOM every time we need them.
+
+**The DOM (Document Object Model)** is a tree-like structure that the browser builds from the HTML. JavaScript can read and modify it.
+
+---
+
+### 3.3.3 `generateId()` — Creating Unique IDs (Lines 150–152)
+
+```javascript
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+```
+
+Every task and subtask needs a unique identifier. Instead of a database auto-increment, we generate one client-side:
+
+- `Date.now()` → Current timestamp in milliseconds (e.g., `1709548000000`)
+- `.toString(36)` → Converts to Base-36 (numbers + a-z letters). Makes it shorter: `"mm9k04v9"` instead of `"1709548000000"`
+- `Math.random().toString(36).substr(2)` → Random number also converted to Base-36, `.substr(2)` removes the leading `"0."` 
+- Concatenating both gives a unique ID like `"mm9k04v9s0ecjqnj4d"`
+
+---
+
+### 3.3.4 [loadTasks()](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php#6-13) — Fetching Data from PHP (Lines 154–158)
+
+```javascript
+async function loadTasks() {
+    const res = await fetch('?api=tasks');
+    tasks = await res.json();
+    render();
+}
+```
+
+#### `async` / `await`
+These keywords handle **asynchronous operations** — things that take time (like a network request). Without them, JavaScript would not wait for the response and would try to use `tasks` before it's loaded.
+
+- `async function` → Marks a function as asynchronous
+- `await` → Pauses this function until the Promise resolves (the response arrives)
+
+#### `fetch('?api=tasks')`
+The `fetch()` API makes an HTTP request from JavaScript, just like your browser makes requests for pages.
+- URL `'?api=tasks'` → Relative URL, resolves to `http://localhost:8000/index.php?api=tasks`
+- This triggers the GET handler in PHP (lines 21–26 of index.php)
+- Returns a **Promise** that resolves when the response arrives
+
+#### `res.json()`
+The `res` (response) object has a `.json()` method that reads the response body and parses it as JSON. It also returns a Promise, so we `await` it too.
+
+**Data flow**: PHP `echo json_encode(loadTasks())` → HTTP response body (`[{"id":"...", "title":"..."}]`) → `fetch()` receives it → `res.json()` parses it → `tasks` array is populated.
+
+---
+
+### 3.3.5 [saveTasks()](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php#14-18) — Sending Data to PHP (Lines 160–166)
+
+```javascript
+async function saveTasks() {
+    await fetch('', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'save', tasks})
+    });
+}
+```
+
+#### `fetch('', { ... })` with POST
+- URL `''` → Empty string means the same URL as the current page ([index.php](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php))
+- `method: 'POST'` → Tells PHP this is a POST request
+- `headers: {'Content-Type': 'application/json'}` → Tells the server we're sending JSON
+- `body: JSON.stringify({action: 'save', tasks})` → Converts our JS object to a JSON string for the request body
+
+#### `JSON.stringify({action: 'save', tasks})`
+`{ action: 'save', tasks }` → ES6 shorthand for `{ action: 'save', tasks: tasks }`
+Result (example): `'{"action":"save","tasks":[{"id":"abc","title":"Task 1",...}]}'`
+
+PHP receives this string, `json_decode`s it, and calls [saveTasks()](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php#14-18).
+
+---
+
+### 3.3.6 `render()` — Top-Level Render (Lines 168–171)
+
+```javascript
+function render() {
+    renderKanban();
+    renderCalendar();
+}
+```
+
+This is the **main render function**. Whenever the `tasks` array changes, call this to update both views.
+
+---
+
+### 3.3.7 `renderKanban()` — Building the Board (Lines 173–197)
+
+```javascript
+function renderKanban() {
+    const columns = {
+        todo:       document.getElementById('todoList'),
+        inprogress: document.getElementById('inprogressList'),
+        done:       document.getElementById('doneList')
+    };
+    
+    Object.keys(columns).forEach(status => {
+        columns[status].innerHTML = '';  // Clear existing cards
+    });
+    
+    const counts = {todo: 0, inprogress: 0, done: 0};
+    
+    tasks.forEach(task => {
+        const card = createTaskCard(task);
+        if (columns[task.status]) {
+            columns[task.status].appendChild(card);
+            counts[task.status]++;
+        }
+    });
+    
+    document.getElementById('todoCount').textContent = counts.todo;
+    document.getElementById('inprogressCount').textContent = counts.inprogress;
+    document.getElementById('doneCount').textContent = counts.done;
+}
+```
+
+#### `Object.keys(columns).forEach(...)`
+- `Object.keys(obj)` → Returns an array of the object's keys: `['todo', 'inprogress', 'done']`
+- `.forEach(status => { ... })` → Loops through each key (status name). Arrow functions `=>` are a concise way to write functions.
+
+#### `element.innerHTML = ''`
+Clears all child HTML inside the element — before re-rendering to avoid duplicates.
+
+#### `tasks.forEach(task => { ... })`
+Loops through every task object in the array. For each task, creates a card DOM element and appends it to the correct column based on `task.status`.
+
+#### `columns[task.status].appendChild(card)`
+This is dynamic property access. If `task.status` is `'todo'`, then `columns['todo']` is the todo column element.
+
+#### `.textContent` vs `.innerHTML`
+- `.textContent` → Sets/gets plain text. Safer — does not parse HTML.
+- `.innerHTML` → Sets/gets HTML. Allows embedding tags but can be a security risk (XSS) if user input is placed here directly.
+
+---
+
+### 3.3.8 `createTaskCard()` — Building Each Card (Lines 199–260)
+
+```javascript
+function createTaskCard(task) {
+    const card = document.createElement('div');
+    card.className = 'task-card';
+    card.draggable = true;
+    card.dataset.id = task.id;
+    
+    // --- Due date color logic ---
+    let dueDateClass = '';
+    if (task.dueDate) {
+        const due = new Date(task.dueDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (due < today) dueDateClass = 'overdue';
+        else if ((due - today) <= 3 * 24 * 60 * 60 * 1000) dueDateClass = 'soon';
+    }
+    // ...
+}
+```
+
+#### `document.createElement('div')`
+Creates a new `<div>` element in memory (not yet on the page).
+
+#### `card.className = 'task-card'`
+Sets the CSS class. Equivalent to `class="task-card"` in HTML.
+
+#### `card.draggable = true`
+Makes the element draggable by the browser's built-in drag-and-drop system.
+
+#### `card.dataset.id = task.id`
+Sets a `data-id` attribute on the element. Used later to identify which task is being dragged.
+
+#### Due Date Color Logic
+```javascript
+const due = new Date(task.dueDate);  // e.g. "2026-03-10" → Date object
+const today = new Date();            // Current date and time
+today.setHours(0, 0, 0, 0);         // Reset time to midnight (for fair comparison)
+
+if (due < today) dueDateClass = 'overdue';                             // Past due
+else if ((due - today) <= 3 * 24 * 60 * 60 * 1000) dueDateClass = 'soon'; // Within 3 days
+```
+
+`due - today` → In JavaScript, subtracting two `Date` objects gives the difference in **milliseconds**. We compare it to:
+- `3 * 24 * 60 * 60 * 1000` = 3 days × 24 hours × 60 min × 60 sec × 1000 ms = **259,200,000 ms**
+
+#### Building Subtask HTML
+```javascript
+let subtasksHtml = '';
+if (task.subtasks && task.subtasks.length > 0) {
+    subtasksHtml = '<div class="task-card-subtasks">';
+    task.subtasks.forEach(subtask => {
+        subtasksHtml += `
+            <div class="task-card-subtask ${subtask.done ? 'done' : ''}">
+                <input type="checkbox" ${subtask.done ? 'checked' : ''} data-subtask-id="${subtask.id}">
+                <span>${escapeHtml(subtask.title)}</span>
+            </div>
+        `;
+    });
+    subtasksHtml += '</div>';
+}
+```
+
+#### Template Literals (Backtick Strings)
+`` `Hello ${name}` `` → Backtick strings allow **string interpolation**: embedding variables/expressions inside `${}`. Much cleaner than concatenation.
+
+#### Ternary Operator
+`condition ? valueIfTrue : valueIfFalse`
+- `subtask.done ? 'done' : ''` → If done, add `'done'` class; else add empty string
+
+#### Setting the card's HTML
+```javascript
+card.innerHTML = `
+    <div class="task-card-title">${escapeHtml(task.title)}</div>
+    ${subtasksHtml}
+    <div class="task-card-meta">
+        ${task.dueDate ? `<span class="task-card-due ${dueDateClass}">📅 ${formatDate(task.dueDate)}</span>` : ''}
+    </div>
+`;
+```
+
+---
+
+### 3.3.9 Event Listeners on Cards (Lines 236–257)
+
+```javascript
+card.addEventListener('click', (e) => {
+    if (e.target.type === 'checkbox') {
+        e.stopPropagation();
+        const subtaskId = e.target.dataset.subtaskId;
+        const subtask = task.subtasks.find(s => s.id === subtaskId);
+        if (subtask) {
+            subtask.done = e.target.checked;
+            saveTasks().then(render);
+        }
+    } else {
+        openTaskModal(task);
+    }
+});
+```
+
+#### `addEventListener(event, callback)`
+- `event` → A string naming the event: `'click'`, `'dragstart'`, `'drop'`, etc.
+- `callback` → A function to execute when the event fires. [(e)](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php#6-13) is the event object.
+
+#### `e.target`
+`e.target` is the actual element that was clicked (could be a child element). `e.currentTarget` would be the element the listener is on (`card` here).
+
+#### `e.stopPropagation()`
+Events **bubble up** the DOM — a click on a checkbox would also trigger a click on the parent card. `stopPropagation()` prevents this, so clicking the checkbox doesn't also open the modal.
+
+#### `task.subtasks.find(s => s.id === subtaskId)`
+`.find()` loops through an array and returns the **first element** that satisfies the condition. If nothing matches, it returns `undefined`.
+
+#### [saveTasks().then(render)](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php#14-18)
+[saveTasks()](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/index.php#14-18) returns a Promise. `.then(render)` means: "After saving is complete, call `render()`". This ensures the board updates only after data is persisted.
+
+---
+
+### 3.3.10 Drag and Drop (Lines 250–278)
+
+#### On the Card
+```javascript
+card.addEventListener('dragstart', (e) => {
+    card.classList.add('dragging');        // Visual: make card semi-transparent
+    e.dataTransfer.setData('text/plain', task.id);  // Store task ID
+});
+
+card.addEventListener('dragend', () => {
+    card.classList.remove('dragging');     // Remove visual effect
+});
+```
+
+`e.dataTransfer` is a special object for drag-and-drop operations — a "clipboard" that holds data during the drag.
+
+#### On the Columns
+```javascript
+document.querySelectorAll('.column').forEach(column => {
+    column.addEventListener('dragover', (e) => {
+        e.preventDefault();   // REQUIRED: allows dropping
+    });
+    
+    column.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const taskId = e.dataTransfer.getData('text/plain');  // Retrieve task ID
+        const newStatus = column.dataset.status;             // Get column's status
+        
+        const task = tasks.find(t => t.id === taskId);
+        if (task && task.status !== newStatus) {
+            task.status = newStatus;       // Mutate the task's status
+            saveTasks().then(render);      // Save and re-render
+        }
+    });
+});
+```
+
+- `dragover` + `e.preventDefault()` → By default, browsers don't allow dropping. Calling `preventDefault()` on `dragover` enables drops.
+- `getData()` → Retrieves the task ID stored during `dragstart`.
+- `column.dataset.status` → Gets the `data-status` attribute value (`'todo'`, `'inprogress'`, or `'done'`).
+
+---
+
+### 3.3.11 `renderCalendar()` — Building the Calendar (Lines 280–344)
+
+```javascript
+function renderCalendar() {
+    const grid = document.getElementById('calendarGrid');
+    const monthLabel = document.getElementById('calendarMonth');
+    
+    const year = calendarDate.getFullYear();   // e.g. 2026
+    const month = calendarDate.getMonth();     // 0-indexed! Jan=0, Dec=11
+    
+    monthLabel.textContent = new Date(year, month).toLocaleDateString('en-US', {
+        month: 'long', year: 'numeric'
+    });   // e.g. "March 2026"
+    
+    const firstDay = new Date(year, month, 1);       // First day of current month
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());  // Go back to Sunday
+    
+    // ... build grid
+}
+```
+
+#### JavaScript Date Object
+
+| Method | Returns |
+|---|---|
+| `new Date()` | Current date & time |
+| `new Date('2026-03-10')` | Specific date |
+| `.getFullYear()` | Year (e.g., 2026) |
+| `.getMonth()` | Month 0–11 (January = 0!) |
+| `.getDate()` | Day of month (1–31) |
+| `.getDay()` | Day of week 0–6 (Sunday = 0) |
+| `.setDate(n)` | Sets the day of month |
+| `.toISOString()` | `"2026-03-10T00:00:00.000Z"` |
+
+#### Calendar Start Calculation
+```javascript
+const firstDay = new Date(year, month, 1);      // e.g., March 1, 2026 (Saturday, day 6)
+startDate.setDate(startDate.getDate() - firstDay.getDay());
+// getDay() of March 1 = 6 (Saturday)
+// setDate(1 - 6) = setDate(-5) → Feb 23, 2026 (the preceding Sunday)
+```
+This finds the **Sunday of the week containing the 1st of the month** — where the calendar grid starts.
+
+#### Creating Day Cells
+```javascript
+for (let i = 0; i < 42; i++) {     // 42 = 6 rows × 7 columns
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + i);   // Increment day by i
+    
+    const cell = document.createElement('div');
+    cell.className = 'calendar-day';
+    
+    if (date.getMonth() !== month) {
+        cell.classList.add('other-month');   // Greyed out days from prev/next month
+    }
+    if (date.getTime() === today.getTime()) {
+        cell.classList.add('today');         // Highlighted today
+    }
+    
+    const dateStr = date.toISOString().split('T')[0]; // "2026-03-10"
+    const dayTasks = tasks.filter(t => t.dueDate === dateStr);  // Tasks due on this date
+    
+    dayTasks.forEach(task => {
+        const taskEl = document.createElement('div');
+        taskEl.className = 'calendar-task' + (task.status === 'done' ? ' done' : '');
+        taskEl.textContent = task.title;
+        cell.appendChild(taskEl);
+    });
+    
+    grid.appendChild(cell);
+}
+```
+
+#### `.filter()`
+Returns a **new array** containing only elements that match the condition:
+```javascript
+tasks.filter(t => t.dueDate === dateStr)
+// Returns: all tasks where dueDate equals this cell's date
+```
+
+#### `toISOString().split('T')[0]`
+- `toISOString()` returns `"2026-03-10T00:00:00.000Z"`
+- `.split('T')` splits on `'T'` → `["2026-03-10", "00:00:00.000Z"]`
+- `[0]` takes the first part → `"2026-03-10"`
+
+---
+
+### 3.3.12 View Toggle (Lines 361–373)
+
+```javascript
+document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        const view = btn.dataset.view;
+        document.getElementById('kanbanView').classList.toggle('active', view === 'kanban');
+        document.getElementById('calendarView').classList.toggle('active', view === 'calendar');
+        currentView = view;
+        
+        if (view === 'calendar') renderCalendar();
+    });
+});
+```
+
+#### `querySelectorAll('.view-btn')`
+Returns a **NodeList** (array-like collection) of all elements with class `view-btn`. Regular CSS selector syntax.
+
+#### `classList.toggle('active', condition)`
+- `.classList.add('class')` → Adds a class
+- `.classList.remove('class')` → Removes a class
+- `.classList.toggle('class', bool)` → Adds if `bool` is `true`, removes if `false`
+
+The CSS for `.kanban-view.active` sets `display: flex`. Without the `.active` class, it's `display: none`.
+
+---
+
+### 3.3.13 `openTaskModal()` (Lines 381–392)
+
+```javascript
+function openTaskModal(task = null, date = null, status = 'todo') {
+    editingTaskId = task ? task.id : null;
+    document.getElementById('modalTitle').textContent = task ? 'Edit Task' : 'Add Task';
+    document.getElementById('taskTitle').value = task ? task.title : '';
+    document.getElementById('taskDueDate').value = task ? task.dueDate : (date || '');
+    document.getElementById('infoEditor').innerHTML = task ? task.info : '';
+    document.getElementById('deleteTaskBtn').style.display = task ? 'block' : 'none';
+    
+    renderSubtasks(task ? task.subtasks : []);
+    modal.classList.add('active');
+}
+```
+
+#### Default Parameters `task = null`
+If the function is called without an argument, `task` defaults to `null`. This way one function handles both Adding (no task) and Editing (task provided).
+
+#### `input.value`
+Reading/writing the value of an `<input>` element in JavaScript.
+
+#### `modal.classList.add('active')`
+Adding the `active` class triggers the CSS `display: flex` rule on `.modal-overlay.active`, making the modal visible.
+
+---
+
+### 3.3.14 Subtask Rendering and Collection (Lines 394–438)
+
+```javascript
+function renderSubtasks(subtasks = []) {
+    subtasksList.innerHTML = '';
+    subtasks.forEach((subtask, index) => {
+        const item = document.createElement('div');
+        item.className = 'subtask-item';
+        item.innerHTML = `
+            <input type="checkbox" ${subtask.done ? 'checked' : ''} data-index="${index}">
+            <input type="text" value="${escapeHtml(subtask.title)}" data-index="${index}">
+            <button class="subtask-remove" data-index="${index}">×</button>
+        `;
+        subtasksList.appendChild(item);
+    });
+}
+```
+
+```javascript
+function getSubtasksFromForm() {
+    const items = subtasksList.querySelectorAll('.subtask-item');
+    const subtasks = [];
+    items.forEach((item, index) => {
+        const checkbox = item.querySelector('input[type="checkbox"]');
+        const text = item.querySelector('input[type="text"]');
+        if (text.value.trim()) {    // Only add subtasks with a non-empty title
+            subtasks.push({
+                id: generateId(),
+                title: text.value.trim(),
+                done: checkbox.checked
+            });
+        }
+    });
+    return subtasks;
+}
+```
+Every time we need to save, we "harvest" data from the form fields by querying the DOM.
+
+---
+
+### 3.3.15 Rich Text Editor (Lines 441–446)
+
+```javascript
+document.querySelectorAll('.info-toolbar button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.execCommand(btn.dataset.command, false, null);
+        document.getElementById('infoEditor').focus();
+    });
+});
+```
+
+#### `document.execCommand(command, showUI, value)`
+A legacy but widely-supported browser API for rich text editing inside a `contenteditable` element.
+- `'bold'` → Wraps selected text in `<b>` tags
+- `'italic'` → Wraps in `<i>` tags
+- `'insertUnorderedList'` → Creates a `<ul>` bullet list
+- `'insertOrderedList'` → Creates an `<ol>` numbered list
+
+The toolbar buttons have `data-command="bold"` etc., so `btn.dataset.command` gives us the right command to pass.
+
+---
+
+### 3.3.16 Saving a Task (Lines 452–487)
+
+```javascript
+document.getElementById('saveTaskBtn').addEventListener('click', () => {
+    const title = document.getElementById('taskTitle').value.trim();
+    if (!title) {
+        alert('Please enter a title');
+        return;
+    }
+    
+    const dueDate  = document.getElementById('taskDueDate').value;
+    const info     = document.getElementById('infoEditor').innerHTML;
+    const subtasks = getSubtasksFromForm();
+    
+    if (editingTaskId) {
+        // EDIT MODE: find existing task and update it
+        const task = tasks.find(t => t.id === editingTaskId);
+        if (task) {
+            task.title    = title;
+            task.dueDate  = dueDate;
+            task.info     = info;
+            task.subtasks = subtasks;
+        }
+    } else {
+        // ADD MODE: create a new task and push to array
+        tasks.push({
+            id:        generateId(),
+            title,
+            status:    'todo',
+            dueDate,
+            info,
+            subtasks,
+            createdAt: new Date().toISOString()
+        });
+    }
+    
+    saveTasks().then(() => {
+        modal.classList.remove('active');  // Close modal
+        render();                          // Re-render UI
+    });
+});
+```
+
+#### `.trim()`
+Removes whitespace from both ends of a string: `"  hello  ".trim()` → `"hello"`.
+
+#### `return;` inside a function
+Exits the function early. Here, if there's no title, we show an alert and stop.
+
+#### `tasks.push({...})`
+`.push()` adds an element to the **end** of an array.
+
+---
+
+### 3.3.17 Deleting a Task (Lines 489–497)
+
+```javascript
+document.getElementById('deleteTaskBtn').addEventListener('click', () => {
+    if (confirm('Delete this task?')) {
+        tasks = tasks.filter(t => t.id !== editingTaskId);
+        saveTasks().then(() => {
+            modal.classList.remove('active');
+            render();
+        });
+    }
+});
+```
+
+`tasks.filter(t => t.id !== editingTaskId)` → Creates a new array with all tasks **except** the one with the matching ID. `!==` means "not equal to".
+
+---
+
+### 3.3.18 Closing Modal on Overlay Click (Lines 499–503)
+
+```javascript
+modal.addEventListener('click', (e) => {
+    if (e.target === modal) {   // Only if clicked on the overlay itself
+        modal.classList.remove('active');
+    }
+});
+```
+
+Clicking the dark background (overlay) closes the modal. The check `e.target === modal` ensures clicking inside the white modal box doesn't close it.
+
+---
+
+### 3.3.19 Utility Functions (Lines 505–514)
+
+#### `escapeHtml(text)` — Security Function
+```javascript
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+```
+**Why do we need this?** If a task title contained `<script>alert('hacked')</script>`, injecting it as `innerHTML` would run the script (called **XSS — Cross-Site Scripting**).
+
+The trick: set it as `.textContent` (plain text, no HTML parsing), then read `.innerHTML` — the browser automatically escapes the characters:
+- `<` → `&lt;`
+- `>` → `&gt;`
+- `"` → `&quot;`
+
+This is now safe to use in `innerHTML`.
+
+#### `formatDate(dateStr)`
+```javascript
+function formatDate(dateStr) {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+}
+// "2026-03-10" → "Mar 10"
+```
+
+`toLocaleDateString(locale, options)` formats a date in a human-readable way. Options:
+- `month: 'short'` → "Mar"
+- `month: 'long'` → "March"
+- `year: 'numeric'` → "2026"
+- `day: 'numeric'` → "10"
+
+---
+
+### Line 516: App Initialization
+```javascript
+loadTasks();
+```
+This single line kicks everything off. When the page loads, the first thing JavaScript does is fetch all tasks from PHP and render the board.
+
+---
+
+# PART 4: CSS Deep Dive ([css/styles.css](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/css/styles.css))
+
+## 4.1 The Reset
+```css
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+```
+- `*` → Universal selector — targets EVERY element on the page
+- `margin: 0; padding: 0;` → Browsers apply default margins/padding to elements (e.g., `<h1>` has default top margin). This removes all of them for consistency.
+- `box-sizing: border-box;` → By default, CSS width excludes padding and border. `border-box` makes width include them. This prevents layout math headaches.
+
+## 4.2 Layout: Flexbox (Kanban Board)
+```css
+.kanban-view.active {
+    display: flex;      /* Activate flexbox */
+    gap: 16px;          /* Space between columns */
+    height: calc(100vh - 120px);  /* Full height minus header */
+}
+
+.column {
+    flex: 1;    /* Each column takes equal share of space */
+    min-width: 280px;
+}
+```
+
+**Flexbox** is a CSS layout mode. When `display: flex` is set on a parent:
+- Child elements (`columns`) become **flex items**
+- They automatically arrange horizontally
+- `flex: 1` makes each column take equal proportional space
+
+`calc(100vh - 120px)` → CSS `calc()` allows math. `100vh` = 100% of the viewport height.
+
+## 4.3 Layout: Grid (Calendar)
+```css
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr); /* 7 equal columns */
+    gap: 1px;
+    background: #e5e7eb;  /* Border color between cells */
+}
+```
+
+**CSS Grid** is for two-dimensional layouts. `repeat(7, 1fr)` creates 7 columns each with `1fr` (one fraction of available space).
+
+## 4.4 Show/Hide Pattern
+```css
+.kanban-view { display: none; }           /* Hidden by default */
+.kanban-view.active { display: flex; }    /* Shown when .active class is added */
+
+.modal-overlay { display: none; }
+.modal-overlay.active { display: flex; }
+```
+
+JavaScript adds/removes the `.active` class. The CSS responds by showing/hiding the element.
+
+## 4.5 Color Variables Used
+```css
+/* Background shades */
+#f5f5f5 /* Light gray - page background */
+#fff    /* White - cards, columns, modal */
+#f9fafb /* Very light gray - hover states */
+#f3f4f6 /* Light gray - badges */
+
+/* Brand Colors */
+#3b82f6 /* Blue - primary buttons, active state */
+#22c55e /* Green - success */
+#f59e0b /* Amber - warning ("soon" due date) */
+#ef4444 /* Red - danger, overdue */
+
+/* Text Colors */
+#1f2937 /* Dark gray - main text */
+#4b5563 /* Medium gray - labels */
+#6b7280 /* Gray - secondary text */
+#9ca3af /* Light gray - placeholders, disabled */
+
+/* Borders */
+#e5e7eb /* Very light gray - borders */
+```
+
+---
+
+# PART 5: The Data — [tasks.json](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/tasks.json)
+
+```json
+[
+    {
+        "id": "mm9k04v9s0ecjqnj4d",
+        "title": "Task 1",
+        "status": "done",
+        "dueDate": "",
+        "info": "<b><u><i>this is a sample task</i></u></b>",
+        "subtasks": [
+            {
+                "id": "mm9knu0uxr9kraw5a5m",
+                "title": "first sbt",
+                "done": false
+            }
+        ],
+        "createdAt": "2026-03-02T19:10:15.717Z"
+    }
+]
+```
+
+JSON (JavaScript Object Notation) rules:
+- Keys must be in **double quotes** (`"id"`, not `id`)
+- Strings are in double quotes
+- Numbers are bare (no quotes): `42`, `3.14`
+- Booleans: `true` / `false` (lowercase)
+- `null` for no value
+- Arrays use `[]`, Objects use `{}`
+- No trailing commas allowed
+
+---
+
+# PART 6: Complete Data Flow Diagrams
+
+## 6.1 App Load
+```
+Browser opens localhost:8000
+         ↓
+PHP runs, outputs HTML page
+         ↓
+Browser renders HTML (empty columns)
+         ↓
+JavaScript runs: loadTasks()
+         ↓
+fetch('?api=tasks') → HTTP GET → PHP
+         ↓
+PHP: echo json_encode(loadTasks())
+         ↓
+Response: '[{"id":"...","title":"..."}]'
+         ↓
+JavaScript: tasks = await res.json()
+         ↓
+render() → renderKanban() + renderCalendar()
+         ↓
+Task cards appear in columns
+```
+
+## 6.2 Adding a Task
+```
+User clicks "+ Add Task" button
+         ↓
+openTaskModal(null, null, 'todo') called
+         ↓
+Modal appears with empty fields
+         ↓
+User fills in title, due date, subtasks
+         ↓
+User clicks "Save"
+         ↓
+Validation: title empty? → alert & stop
+         ↓
+tasks.push({ new task object })
+         ↓
+saveTasks() → fetch POST → PHP
+         ↓
+PHP: json_decode body → saveTasks($tasks)
+         ↓
+PHP: file_put_contents('tasks.json', newJson)
+         ↓
+Response: {"success": true}
+         ↓
+modal.classList.remove('active') → modal hides
+render() → board updates with new card
+```
+
+## 6.3 Drag and Drop
+```
+User grabs card → dragstart event
+         ↓
+card gets 'dragging' class (opacity 0.5)
+e.dataTransfer.setData('text/plain', taskId)
+         ↓
+User hovers over column → dragover event
+e.preventDefault() [enables drop]
+         ↓
+User releases → drop event
+e.dataTransfer.getData('text/plain') → taskId
+column.dataset.status → newStatus
+         ↓
+task = tasks.find(t => t.id === taskId)
+task.status = newStatus
+         ↓
+saveTasks().then(render)
+```
+
+---
+
+# PART 7: Viva Questions & Model Answers
+
+### Q1: What is PHP and where does it run?
+**A:** PHP is a server-side scripting language. It runs on the **server** (not in the browser). When a user requests a PHP file, the server executes the PHP code and sends back plain HTML to the browser. The user never sees PHP code.
+
+### Q2: How is data persisted without a database?
+**A:** This application uses **Flat File Storage** via [tasks.json](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/tasks.json). PHP's `file_put_contents()` overwrites the JSON file every time data changes, and `file_get_contents()` reads it. JSON format allows structured data to be stored as text.
+
+### Q3: What is the difference between GET and POST?
+**A:** 
+- **GET**: Used to retrieve data. Parameters are visible in the URL (`?api=tasks`). Should not modify server data.
+- **POST**: Used to send data to the server. The data is in the request body, not the URL. Used here to save task data.
+
+### Q4: What are PHP Superglobals?
+**A:** Superglobals are built-in PHP variables that are always available everywhere, regardless of scope. Examples: `$_GET` (URL params), `$_POST` (form data), `$_SERVER` (server/request info), `$_SESSION` (user session), `$_COOKIE`.
+
+### Q5: What is JSON and why is it used here?
+**A:** JSON (JavaScript Object Notation) is a lightweight, text-based data format. It's used because: (1) JavaScript can parse it natively, (2) PHP has built-in `json_encode`/`json_decode` functions, (3) it's human-readable, (4) it can represent complex nested data structures.
+
+### Q6: Explain the `async/await` pattern in JavaScript.
+**A:** `async/await` is syntactic sugar for Promises. Network requests (like `fetch`) are asynchronous — they take time. `await` pauses execution of the `async` function until the Promise resolves. This prevents trying to use data before it has arrived from the server.
+
+### Q7: What is the HTML5 Drag and Drop API?
+**A:** It's a native browser feature enabling drag-and-drop interactions. Key events: `dragstart` (initiated by the dragged element), `dragover` (target element, must call `e.preventDefault()` to allow dropping), `drop` (data is transferred). `dataTransfer` object carries data between source and target.
+
+### Q8: What is XSS and how does this project prevent it?
+**A:** XSS (Cross-Site Scripting) is a vulnerability where malicious script tags are injected through user input. This project uses `escapeHtml()` — a function that converts `<` to `&lt;` and `>` to `&gt;` before inserting user text into `innerHTML`, preventing the browser from executing injected scripts.
+
+### Q9: What is `contenteditable` and why is it used in the Info field?
+**A:** `contenteditable="true"` is an HTML attribute that makes any element directly editable by the user, like a built-in text editor. Combined with `document.execCommand()`, it supports rich text formatting (bold, italic, lists) without needing any library.
+
+### Q10: What does `json_decode($string, true)` do and why is `true` important?
+**A:** `json_decode()` converts a JSON string to a PHP data structure. Without the `true` flag, it returns a `stdClass` object (accessed with `->` arrow). With `true`, it returns an **associative array** (accessed with `['key']`). Associative arrays are more convenient for PHP manipulation.
+
+### Q11: How does the Calendar view calculate which day to start on?
+**A:** It gets the first day of the month and checks its day-of-week with `getDay()` (Sun=0, Sat=6). It then subtracts that many days from the 1st to find the preceding Sunday. From there, it renders 42 cells (6 weeks × 7 days) to always fill the calendar grid.
+
+### Q12: What is the Single Responsibility of each technology in this project?
+**A:** 
+- **PHP**: Data management — reads/writes [tasks.json](file:///c:/Users/Harsh%20Y%20Dhakan/Desktop/php%20stuff/tasks.json), serves data as JSON API
+- **HTML**: Structure — defines the skeleton of the UI
+- **CSS**: Presentation — visual styling, layout (Flexbox, Grid), animations
+- **JavaScript**: Behaviour — dynamic DOM manipulation, event handling, API communication
+
+### Q13: What is `e.stopPropagation()` and why is it used in the checkbox click handler?
+**A:** Events bubble up the DOM tree — a click on a child element also fires click events on all parent elements. When clicking a subtask checkbox, `stopPropagation()` prevents that click from also triggering the parent card's click handler (which would open the edit modal).
+
+### Q14: What is the purpose of `exit;` in PHP?
+**A:** It immediately terminates the PHP script. In the API handlers, it's called after `echo`-ing JSON data to prevent PHP from continuing and printing the HTML page after the JSON response, which would corrupt the data returned to JavaScript.
+
+### Q15: Explain Flexbox vs CSS Grid.
+**A:** 
+- **Flexbox** (`display: flex`) is **one-dimensional** — arranges items in a row or column. Used for the Kanban columns (horizontal row) and within each column (vertical stack).
+- **CSS Grid** (`display: grid`) is **two-dimensional** — arranges items in rows AND columns simultaneously. Used for the Calendar (7 columns × 6 rows).
+
+---
+
+*End of Documentation — MinimalTodo Project*
