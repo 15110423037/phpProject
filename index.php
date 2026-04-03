@@ -1,5 +1,4 @@
 <?php
-header('Content-Type: text/html; charset=UTF-8');
 
 $tasksFile = 'tasks.json';
 
@@ -13,27 +12,139 @@ function loadTasks() {
 
 function saveTasks($tasks) {
     global $tasksFile;
-    file_put_contents($tasksFile, json_encode($tasks, JSON_PRETTY_PRINT));
+    return file_put_contents($tasksFile, json_encode($tasks, JSON_PRETTY_PRINT), LOCK_EX) !== false;
+}
+
+function isValidStatus($status) {
+    return in_array($status, ['created', 'inprogress', 'done'], true);
+}
+
+function canonicalizeStatus($status) {
+    if ($status === 'todo') {
+        return 'created';
+    }
+    return $status;
+}
+
+function normalizeTaskStatus($status, $subtasks) {
+    $status = canonicalizeStatus($status);
+
+    if (!empty($subtasks)) {
+        $allDone = true;
+        $anyDone = false;
+        foreach ($subtasks as $subtask) {
+            if (!empty($subtask['done'])) {
+                $anyDone = true;
+            } else {
+                $allDone = false;
+            }
+        }
+
+        if ($allDone) {
+            return 'done';
+        }
+
+        if ($anyDone) {
+            return 'inprogress';
+        }
+
+        if ($status === 'done') {
+            return 'inprogress';
+        }
+    }
+
+    return isValidStatus($status) ? $status : 'created';
+}
+
+function normalizeTaskPayload($task) {
+    if (!is_array($task)) {
+        return null;
+    }
+
+    $title = isset($task['title']) ? trim((string) $task['title']) : '';
+    if ($title === '') {
+        return null;
+    }
+
+    $subtasks = [];
+    if (isset($task['subtasks']) && is_array($task['subtasks'])) {
+        foreach ($task['subtasks'] as $subtask) {
+            if (!is_array($subtask)) {
+                continue;
+            }
+
+            $subtaskTitle = isset($subtask['title']) ? trim((string) $subtask['title']) : '';
+            if ($subtaskTitle === '') {
+                continue;
+            }
+
+            $subtasks[] = [
+                'id' => isset($subtask['id']) ? (string) $subtask['id'] : uniqid(),
+                'title' => $subtaskTitle,
+                'done' => !empty($subtask['done'])
+            ];
+        }
+    }
+
+    $status = isset($task['status']) ? (string) $task['status'] : 'created';
+    $dueDate = isset($task['dueDate']) ? (string) $task['dueDate'] : '';
+    $createdAt = isset($task['createdAt']) ? (string) $task['createdAt'] : gmdate('c');
+
+    return [
+        'id' => isset($task['id']) ? (string) $task['id'] : uniqid(),
+        'title' => $title,
+        'status' => normalizeTaskStatus($status, $subtasks),
+        'dueDate' => $dueDate,
+        'info' => isset($task['info']) ? (string) $task['info'] : '',
+        'subtasks' => $subtasks,
+        'createdAt' => $createdAt
+    ];
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET' && isset($_GET['api'])) {
     if ($_GET['api'] === 'tasks') {
+        header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(loadTasks());
     }
     exit;
 }
 
 if ($method === 'POST') {
+    header('Content-Type: application/json; charset=UTF-8');
     $input = json_decode(file_get_contents('php://input'), true);
-    
+
     if (isset($input['action']) && $input['action'] === 'save') {
-        saveTasks($input['tasks']);
+        if (!isset($input['tasks']) || !is_array($input['tasks'])) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid tasks payload']);
+            exit;
+        }
+
+        $normalizedTasks = [];
+        foreach ($input['tasks'] as $task) {
+            $normalizedTask = normalizeTaskPayload($task);
+            if ($normalizedTask === null) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Invalid task data']);
+                exit;
+            }
+            $normalizedTasks[] = $normalizedTask;
+        }
+
+        if (!saveTasks($normalizedTasks)) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to save tasks']);
+            exit;
+        }
+
         echo json_encode(['success' => true]);
         exit;
     }
 }
+
+header('Content-Type: text/html; charset=UTF-8');
 
 $tasks = loadTasks();
 ?>
@@ -56,13 +167,13 @@ $tasks = loadTasks();
     
     <main>
         <div class="kanban-view active" id="kanbanView">
-            <div class="column" data-status="todo">
+            <div class="column" data-status="created">
                 <div class="column-header">
-                    <span>Todo</span>
-                    <span class="column-count" id="todoCount">0</span>
+                    <span>Created</span>
+                    <span class="column-count" id="createdCount">0</span>
                 </div>
-                <div class="task-list" id="todoList"></div>
-                <button class="add-task-btn" data-status="todo">+ Add Task</button>
+                <div class="task-list" id="createdList"></div>
+                <button class="add-task-btn" data-status="created">+ Add Task</button>
             </div>
             
             <div class="column" data-status="inprogress">
@@ -142,7 +253,7 @@ $tasks = loadTasks();
         let tasks = [];
         let currentView = 'kanban';
         let editingTaskId = null;
-        let currentTaskStatus = 'todo';
+        let currentTaskStatus = 'created';
         let calendarDate = new Date();
         
         const modal = document.getElementById('taskModal');
@@ -151,19 +262,113 @@ $tasks = loadTasks();
         function generateId() {
             return Date.now().toString(36) + Math.random().toString(36).substr(2);
         }
+
+        function isValidStatus(status) {
+            return status === 'created' || status === 'inprogress' || status === 'done';
+        }
+
+        function canonicalizeStatus(status) {
+            if (status === 'todo') return 'created';
+            return status;
+        }
+
+        function normalizeTaskStatus(task, preferredStatus = null) {
+            const candidateStatus = canonicalizeStatus(preferredStatus);
+            const currentStatus = canonicalizeStatus(task.status);
+            const baseStatus = isValidStatus(candidateStatus) ? candidateStatus : (isValidStatus(currentStatus) ? currentStatus : 'created');
+
+            if (task.subtasks && task.subtasks.length > 0) {
+                const allDone = task.subtasks.every(s => s.done);
+                const anyDone = task.subtasks.some(s => s.done);
+                if (allDone) {
+                    return 'done';
+                }
+                if (anyDone) {
+                    return 'inprogress';
+                }
+                if (baseStatus === 'done') {
+                    return 'inprogress';
+                }
+            }
+
+            return baseStatus;
+        }
+
+        function normalizeTask(task) {
+            const originalStatus = task.status;
+            task.status = normalizeTaskStatus(task);
+            return originalStatus !== task.status;
+        }
+
+        function normalizeAllTasks() {
+            let changed = false;
+            tasks.forEach(task => {
+                if (normalizeTask(task)) {
+                    changed = true;
+                }
+            });
+            return changed;
+        }
+
+        function parseLocalDate(dateStr) {
+            if (!dateStr) return null;
+            const parts = dateStr.split('-').map(Number);
+            if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+            return new Date(parts[0], parts[1] - 1, parts[2]);
+        }
+
+        function toLocalDateKey(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function handlePersistenceError(error, context = 'save') {
+            console.error(`Task ${context} failed:`, error);
+            alert(`Failed to ${context} tasks. Reloading latest saved data.`);
+            loadTasks();
+        }
         
         async function loadTasks() {
-            const res = await fetch('?api=tasks');
-            tasks = await res.json();
-            render();
+            try {
+                const res = await fetch('?api=tasks');
+                if (!res.ok) {
+                    throw new Error(`Load failed with status ${res.status}`);
+                }
+
+                const data = await res.json();
+                tasks = Array.isArray(data) ? data : [];
+
+                const normalized = normalizeAllTasks();
+                render();
+
+                if (normalized) {
+                    saveTasks().catch(error => handlePersistenceError(error, 'normalize'));
+                }
+            } catch (error) {
+                console.error('Task load failed:', error);
+                alert('Failed to load tasks. Please refresh and try again.');
+                tasks = [];
+                render();
+            }
         }
         
         async function saveTasks() {
-            await fetch('', {
+            const res = await fetch('', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({action: 'save', tasks})
             });
+
+            if (!res.ok) {
+                throw new Error(`Save failed with status ${res.status}`);
+            }
+
+            const payload = await res.json();
+            if (!payload.success) {
+                throw new Error(payload.error || 'Save failed');
+            }
         }
         
         function render() {
@@ -173,7 +378,7 @@ $tasks = loadTasks();
         
         function renderKanban() {
             const columns = {
-                todo: document.getElementById('todoList'),
+                created: document.getElementById('createdList'),
                 inprogress: document.getElementById('inprogressList'),
                 done: document.getElementById('doneList')
             };
@@ -182,7 +387,7 @@ $tasks = loadTasks();
                 columns[status].innerHTML = '';
             });
             
-            const counts = {todo: 0, inprogress: 0, done: 0};
+            const counts = {created: 0, inprogress: 0, done: 0};
             
             tasks.forEach(task => {
                 const card = createTaskCard(task);
@@ -192,7 +397,7 @@ $tasks = loadTasks();
                 }
             });
             
-            document.getElementById('todoCount').textContent = counts.todo;
+            document.getElementById('createdCount').textContent = counts.created;
             document.getElementById('inprogressCount').textContent = counts.inprogress;
             document.getElementById('doneCount').textContent = counts.done;
         }
@@ -205,11 +410,13 @@ $tasks = loadTasks();
             
             let dueDateClass = '';
             if (task.dueDate) {
-                const due = new Date(task.dueDate);
+                const due = parseLocalDate(task.dueDate);
                 const today = new Date();
                 today.setHours(0,0,0,0);
-                if (due < today) dueDateClass = 'overdue';
-                else if ((due - today) <= 3 * 24 * 60 * 60 * 1000) dueDateClass = 'soon';
+                if (due) {
+                    if (due < today) dueDateClass = 'overdue';
+                    else if ((due - today) <= 3 * 24 * 60 * 60 * 1000) dueDateClass = 'soon';
+                }
             }
             
             let subtasksHtml = '';
@@ -242,7 +449,10 @@ $tasks = loadTasks();
                     const subtask = task.subtasks.find(s => s.id === subtaskId);
                     if (subtask) {
                         subtask.done = e.target.checked;
-                        saveTasks().then(render);
+
+                        task.status = normalizeTaskStatus(task);
+
+                        saveTasks().then(render).catch(error => handlePersistenceError(error, 'save'));
                     }
                 } else {
                     openTaskModal(task);
@@ -273,8 +483,14 @@ $tasks = loadTasks();
                 
                 const task = tasks.find(t => t.id === taskId);
                 if (task && task.status !== newStatus) {
-                    task.status = newStatus;
-                    saveTasks().then(render);
+                    task.status = normalizeTaskStatus(task, newStatus);
+                    
+                    if (newStatus === 'done' && task.subtasks) {
+                        task.subtasks.forEach(s => s.done = true);
+                        task.status = normalizeTaskStatus(task, 'done');
+                    }
+                    
+                    saveTasks().then(render).catch(error => handlePersistenceError(error, 'save'));
                 }
             });
         });
@@ -325,7 +541,7 @@ $tasks = loadTasks();
                 dayNum.textContent = date.getDate();
                 cell.appendChild(dayNum);
                 
-                const dateStr = date.toISOString().split('T')[0];
+                const dateStr = toLocalDateKey(date);
                 const dayTasks = tasks.filter(t => t.dueDate === dateStr);
                 
                 dayTasks.forEach(task => {
@@ -380,12 +596,13 @@ $tasks = loadTasks();
             });
         });
         
-        function openTaskModal(task = null, date = null, status = 'todo') {
+        function openTaskModal(task = null, date = null, status = 'created') {
             editingTaskId = task ? task.id : null;
             currentTaskStatus = status;
             document.getElementById('modalTitle').textContent = task ? 'Edit Task' : 'Add Task';
             document.getElementById('taskTitle').value = task ? task.title : '';
-            document.getElementById('taskDueDate').value = task ? task.dueDate : (date || '');
+            const defaultDate = date || toLocalDateKey(new Date());
+            document.getElementById('taskDueDate').value = task ? task.dueDate : defaultDate;
             document.getElementById('infoEditor').innerHTML = task ? task.info : '';
             document.getElementById('deleteTaskBtn').style.display = task ? 'block' : 'none';
             
@@ -470,12 +687,20 @@ $tasks = loadTasks();
                     task.dueDate = dueDate;
                     task.info = info;
                     task.subtasks = subtasks;
+
+                    task.status = normalizeTaskStatus(task);
                 }
             } else {
+                const draftTask = {
+                    status: currentTaskStatus,
+                    subtasks: subtasks
+                };
+                const status = normalizeTaskStatus(draftTask, currentTaskStatus);
+                
                 tasks.push({
                     id: generateId(),
                     title,
-                    status: currentTaskStatus,
+                    status: status,
                     dueDate,
                     info,
                     subtasks,
@@ -486,7 +711,7 @@ $tasks = loadTasks();
             saveTasks().then(() => {
                 modal.classList.remove('active');
                 render();
-            });
+            }).catch(error => handlePersistenceError(error, 'save'));
         });
         
         document.getElementById('deleteTaskBtn').addEventListener('click', () => {
@@ -495,7 +720,7 @@ $tasks = loadTasks();
                 saveTasks().then(() => {
                     modal.classList.remove('active');
                     render();
-                });
+                }).catch(error => handlePersistenceError(error, 'delete'));
             }
         });
         
@@ -512,7 +737,8 @@ $tasks = loadTasks();
         }
         
         function formatDate(dateStr) {
-            const date = new Date(dateStr);
+            const date = parseLocalDate(dateStr);
+            if (!date) return '';
             return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
         }
         
