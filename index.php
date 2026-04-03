@@ -142,6 +142,7 @@ $tasks = loadTasks();
         let tasks = [];
         let currentView = 'kanban';
         let editingTaskId = null;
+        let currentTaskStatus = 'todo';
         let calendarDate = new Date();
         
         const modal = document.getElementById('taskModal');
@@ -213,7 +214,8 @@ $tasks = loadTasks();
             
             let subtasksHtml = '';
             if (task.subtasks && task.subtasks.length > 0) {
-                subtasksHtml = '<div class="task-card-subtasks">';
+                const allDone = task.subtasks.every(s => s.done);
+                subtasksHtml = `<div class="task-card-subtasks ${allDone ? 'complete' : ''}">`;
                 task.subtasks.forEach(subtask => {
                     subtasksHtml += `
                         <div class="task-card-subtask ${subtask.done ? 'done' : ''}">
@@ -380,6 +382,7 @@ $tasks = loadTasks();
         
         function openTaskModal(task = null, date = null, status = 'todo') {
             editingTaskId = task ? task.id : null;
+            currentTaskStatus = status;
             document.getElementById('modalTitle').textContent = task ? 'Edit Task' : 'Add Task';
             document.getElementById('taskTitle').value = task ? task.title : '';
             document.getElementById('taskDueDate').value = task ? task.dueDate : (date || '');
@@ -396,6 +399,7 @@ $tasks = loadTasks();
             subtasks.forEach((subtask, index) => {
                 const item = document.createElement('div');
                 item.className = 'subtask-item';
+                item.dataset.id = subtask.id;
                 item.innerHTML = `
                     <input type="checkbox" ${subtask.done ? 'checked' : ''} data-index="${index}">
                     <input type="text" value="${escapeHtml(subtask.title)}" data-index="${index}">
@@ -406,7 +410,6 @@ $tasks = loadTasks();
         }
         
         document.getElementById('addSubtaskBtn').addEventListener('click', () => {
-            const items = subtasksList.querySelectorAll('.subtask-item');
             const subtasks = getSubtasksFromForm();
             subtasks.push({id: generateId(), title: '', done: false});
             renderSubtasks(subtasks);
@@ -429,7 +432,7 @@ $tasks = loadTasks();
                 const text = item.querySelector('input[type="text"]');
                 if (text.value.trim()) {
                     subtasks.push({
-                        id: generateId(),
+                        id: item.dataset.id || generateId(),
                         title: text.value.trim(),
                         done: checkbox.checked
                     });
@@ -472,7 +475,7 @@ $tasks = loadTasks();
                 tasks.push({
                     id: generateId(),
                     title,
-                    status: 'todo',
+                    status: currentTaskStatus,
                     dueDate,
                     info,
                     subtasks,
